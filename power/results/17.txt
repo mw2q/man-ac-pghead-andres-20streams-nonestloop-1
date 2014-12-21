@@ -1,0 +1,54 @@
+BEGIN;
+BEGIN
+EXPLAIN (ANALYZE, BUFFERS)
+select
+	sum(l_extendedprice) / 7.0 as avg_yearly
+from
+	lineitem,
+	part
+where
+	p_partkey = l_partkey
+	and p_brand = 'Brand#33'
+	and p_container = 'MED DRUM'
+	and l_quantity < (
+		select
+			0.2 * avg(l_quantity)
+		from
+			lineitem
+		where
+			l_partkey = p_partkey
+	);
+                                                                                            QUERY PLAN                                                                                             
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Aggregate  (cost=9870958.99..9870959.01 rows=1 width=4) (actual time=26019.846..26019.846 rows=1 loops=1)
+   Buffers: shared hit=3148777 read=42843
+   ->  Hash Join  (cost=6812.03..9870907.58 rows=20566 width=4) (actual time=55.590..26018.251 rows=5412 loops=1)
+         Hash Cond: (lineitem.l_partkey = part.p_partkey)
+         Join Filter: (lineitem.l_quantity < (SubPlan 1))
+         Rows Removed by Join Filter: 55024
+         Buffers: shared hit=3148777 read=42843
+         ->  Seq Scan on lineitem  (cost=0.00..1666929.68 rows=60045468 width=12) (actual time=0.027..14267.924 rows=60045669 loops=1)
+               Buffers: shared hit=1031004 read=35471
+         ->  Hash  (cost=6786.34..6786.34 rows=2055 width=4) (actual time=40.590..40.590 rows=2016 loops=1)
+               Buckets: 4096  Batches: 1  Memory Usage: 103kB
+               Buffers: shared read=1988
+               ->  Bitmap Heap Scan on part  (cost=73.49..6786.34 rows=2055 width=4) (actual time=1.336..39.452 rows=2016 loops=1)
+                     Recheck Cond: ((p_container = 'MED DRUM'::bpchar) AND (p_brand = 'Brand#33'::bpchar))
+                     Heap Blocks: exact=1973
+                     Buffers: shared read=1988
+                     ->  Bitmap Index Scan on part_p_container_p_brand_p_partkey_idx  (cost=0.00..72.98 rows=2055 width=0) (actual time=0.968..0.968 rows=2016 loops=1)
+                           Index Cond: ((p_container = 'MED DRUM'::bpchar) AND (p_brand = 'Brand#33'::bpchar))
+                           Buffers: shared read=15
+         SubPlan 1
+           ->  Aggregate  (cost=129.19..129.20 rows=1 width=4) (actual time=0.071..0.071 rows=1 loops=60436)
+                 Buffers: shared hit=2117770 read=5384
+                 ->  Index Only Scan using lineitem_l_partkey_l_quantity_l_shipmode_idx on lineitem lineitem_1  (cost=0.56..129.11 rows=31 width=4) (actual time=0.014..0.066 rows=31 loops=60436)
+                       Index Cond: (l_partkey = part.p_partkey)
+                       Heap Fetches: 1871124
+                       Buffers: shared hit=2117770 read=5384
+ Planning time: 4.546 ms
+ Execution time: 26020.083 ms
+(28 rows)
+
+COMMIT;
+COMMIT

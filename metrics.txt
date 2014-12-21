@@ -1,0 +1,4 @@
+
+power = 1087.05646873077
+throughput = No throughput data retrieved from database.
+composite = 

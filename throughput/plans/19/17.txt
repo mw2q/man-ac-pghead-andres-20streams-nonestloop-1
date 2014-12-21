@@ -1,0 +1,41 @@
+BEGIN;
+BEGIN
+EXPLAIN
+select
+	sum(l_extendedprice) / 7.0 as avg_yearly
+from
+	lineitem,
+	part
+where
+	p_partkey = l_partkey
+	and p_brand = 'Brand#35'
+	and p_container = 'WRAP BOX'
+	and l_quantity < (
+		select
+			0.2 * avg(l_quantity)
+		from
+			lineitem
+		where
+			l_partkey = p_partkey
+	);
+                                                                     QUERY PLAN                                                                     
+----------------------------------------------------------------------------------------------------------------------------------------------------
+ Aggregate  (cost=9847682.45..9847682.46 rows=1 width=4)
+   ->  Hash Join  (cost=6793.81..9847631.19 rows=20506 width=4)
+         Hash Cond: (lineitem.l_partkey = part.p_partkey)
+         Join Filter: (lineitem.l_quantity < (SubPlan 1))
+         ->  Seq Scan on lineitem  (cost=0.00..1666929.68 rows=60045468 width=12)
+         ->  Hash  (cost=6768.19..6768.19 rows=2049 width=4)
+               ->  Bitmap Heap Scan on part  (cost=73.43..6768.19 rows=2049 width=4)
+                     Recheck Cond: ((p_container = 'WRAP BOX'::bpchar) AND (p_brand = 'Brand#35'::bpchar))
+                     ->  Bitmap Index Scan on part_p_container_p_brand_p_partkey_idx  (cost=0.00..72.92 rows=2049 width=0)
+                           Index Cond: ((p_container = 'WRAP BOX'::bpchar) AND (p_brand = 'Brand#35'::bpchar))
+         SubPlan 1
+           ->  Aggregate  (cost=129.19..129.20 rows=1 width=4)
+                 ->  Index Only Scan using lineitem_l_partkey_l_quantity_l_shipmode_idx on lineitem lineitem_1  (cost=0.56..129.11 rows=31 width=4)
+                       Index Cond: (l_partkey = part.p_partkey)
+ Planning time: 2.268 ms
+(15 rows)
+
+COMMIT;
+COMMIT

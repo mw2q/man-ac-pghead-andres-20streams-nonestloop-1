@@ -1,0 +1,84 @@
+BEGIN;
+BEGIN
+EXPLAIN (ANALYZE, BUFFERS)
+select
+	c_name,
+	c_custkey,
+	o_orderkey,
+	o_orderdate,
+	o_totalprice,
+	sum(l_quantity)
+from
+	customer,
+	orders,
+	lineitem
+where
+	o_orderkey in (
+		select
+			l_orderkey
+		from
+			lineitem
+		group by
+			l_orderkey having
+				sum(l_quantity) > 313
+	)
+	and c_custkey = o_custkey
+	and o_orderkey = l_orderkey
+group by
+	c_name,
+	c_custkey,
+	o_orderkey,
+	o_orderdate,
+	o_totalprice
+order by
+	o_totalprice desc,
+	o_orderdate
+LIMIT 100;
+                                                                                        QUERY PLAN                                                                                         
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=10271718.93..10271721.68 rows=100 width=39) (actual time=89044.454..89044.766 rows=100 loops=1)
+   Buffers: shared hit=1918486 read=531888 dirtied=255 written=12237
+   ->  GroupAggregate  (cost=10271718.93..11107243.34 rows=30382706 width=39) (actual time=89044.452..89044.750 rows=100 loops=1)
+         Group Key: orders.o_totalprice, orders.o_orderdate, customer.c_name, customer.c_custkey, orders.o_orderkey
+         Buffers: shared hit=1918486 read=531888 dirtied=255 written=12237
+         ->  Sort  (cost=10271718.93..10347675.69 rows=30382706 width=39) (actual time=89044.436..89044.474 rows=701 loops=1)
+               Sort Key: orders.o_totalprice, orders.o_orderdate, customer.c_name, customer.c_custkey, orders.o_orderkey
+               Sort Method: quicksort  Memory: 80kB
+               Buffers: shared hit=1918486 read=531888 dirtied=255 written=12237
+               ->  Hash Join  (cost=2914554.43..5664865.24 rows=30382706 width=39) (actual time=66613.474..89042.678 rows=707 loops=1)
+                     Hash Cond: (lineitem.l_orderkey = orders.o_orderkey)
+                     Buffers: shared hit=1918474 read=531888 dirtied=255 written=12237
+                     ->  Seq Scan on lineitem  (cost=0.00..1686916.11 rows=60765411 width=8) (actual time=0.050..12362.681 rows=59985538 loops=1)
+                           Buffers: shared hit=969010 read=110252 written=2
+                     ->  Hash  (cost=2819586.23..2819586.23 rows=7597456 width=39) (actual time=66169.074..66169.074 rows=101 loops=1)
+                           Buckets: 8388608  Batches: 1  Memory Usage: 65544kB
+                           Buffers: shared hit=949464 read=421636 dirtied=255 written=12235
+                           ->  Hash Join  (cost=2200053.65..2819586.23 rows=7597456 width=39) (actual time=55083.687..66168.363 rows=101 loops=1)
+                                 Hash Cond: (orders.o_custkey = customer.c_custkey)
+                                 Buffers: shared hit=949464 read=421636 dirtied=255 written=12235
+                                 ->  Hash Join  (cost=2131025.65..2636596.39 rows=7597456 width=20) (actual time=53558.679..64636.105 rows=101 loops=1)
+                                       Hash Cond: (orders.o_orderkey = lineitem_1.l_orderkey)
+                                       Buffers: shared hit=949463 read=386359 dirtied=255 written=11974
+                                       ->  Seq Scan on orders  (cost=0.00..408509.11 rows=15194911 width=16) (actual time=0.018..5405.752 rows=15000000 loops=1)
+                                             Buffers: shared read=256560 dirtied=255 written=11951
+                                       ->  Hash  (cost=2080924.76..2080924.76 rows=4008071 width=4) (actual time=53388.032..53388.032 rows=101 loops=1)
+                                             Buckets: 4194304  Batches: 1  Memory Usage: 32772kB
+                                             Buffers: shared hit=949463 read=129799 written=23
+                                             ->  HashAggregate  (cost=1990743.17..2040844.05 rows=4008071 width=8) (actual time=46042.839..53387.080 rows=101 loops=1)
+                                                   Group Key: lineitem_1.l_orderkey
+                                                   Filter: (sum(lineitem_1.l_quantity) > 313::double precision)
+                                                   Rows Removed by Filter: 14999899
+                                                   Buffers: shared hit=949463 read=129799 written=23
+                                                   ->  Seq Scan on lineitem lineitem_1  (cost=0.00..1686916.11 rows=60765411 width=8) (actual time=0.012..15399.442 rows=59985538 loops=1)
+                                                         Buffers: shared hit=949463 read=129799 written=23
+                                 ->  Hash  (cost=50278.00..50278.00 rows=1500000 width=23) (actual time=1510.482..1510.482 rows=1500000 loops=1)
+                                       Buckets: 2097152  Batches: 1  Memory Usage: 98416kB
+                                       Buffers: shared hit=1 read=35277 written=261
+                                       ->  Seq Scan on customer  (cost=0.00..50278.00 rows=1500000 width=23) (actual time=0.010..919.643 rows=1500000 loops=1)
+                                             Buffers: shared hit=1 read=35277 written=261
+ Planning time: 4.875 ms
+ Execution time: 89191.403 ms
+(42 rows)
+
+COMMIT;
+COMMIT

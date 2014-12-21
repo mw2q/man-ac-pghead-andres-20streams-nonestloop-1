@@ -1,0 +1,41 @@
+BEGIN;
+BEGIN
+EXPLAIN (ANALYZE, BUFFERS)
+select
+	100.00 * sum(case
+		when p_type like 'PROMO%'
+			then l_extendedprice * (1 - l_discount)
+		else 0
+	end) / sum(l_extendedprice * (1 - l_discount)) as promo_revenue
+from
+	lineitem,
+	part
+where
+	l_partkey = p_partkey
+	and l_shipdate >= date '1996-04-01'
+	and l_shipdate < cast(date '1996-04-01' + interval '1 month' as date);
+                                                                               QUERY PLAN                                                                                
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Aggregate  (cost=1164458.40..1164458.41 rows=1 width=29) (actual time=7569.949..7569.949 rows=1 loops=1)
+   Buffers: shared hit=209789 read=238746
+   ->  Hash Join  (cost=101733.74..1151067.61 rows=765188 width=29) (actual time=2310.292..7186.687 rows=748261 loops=1)
+         Hash Cond: (lineitem.l_partkey = part.p_partkey)
+         Buffers: shared hit=209789 read=238746
+         ->  Bitmap Heap Scan on lineitem  (cost=16211.74..1054067.79 rows=765188 width=12) (actual time=622.370..4720.527 rows=748261 loops=1)
+               Recheck Cond: ((l_shipdate >= '1996-04-01'::date) AND (l_shipdate < '1996-05-01'::date))
+               Heap Blocks: exact=405964
+               Buffers: shared hit=197516 read=210494
+               ->  Bitmap Index Scan on lineitem_l_shipdate_l_suppkey__idx  (cost=0.00..16020.45 rows=765188 width=0) (actual time=403.977..403.977 rows=749731 loops=1)
+                     Index Cond: ((l_shipdate >= '1996-04-01'::date) AND (l_shipdate < '1996-05-01'::date))
+                     Buffers: shared hit=1 read=2045
+         ->  Hash  (cost=60522.00..60522.00 rows=2000000 width=25) (actual time=1675.521..1675.521 rows=2000000 loops=1)
+               Buckets: 2097152  Batches: 1  Memory Usage: 131903kB
+               Buffers: shared hit=12270 read=28252
+               ->  Seq Scan on part  (cost=0.00..60522.00 rows=2000000 width=25) (actual time=0.015..889.708 rows=2000000 loops=1)
+                     Buffers: shared hit=12270 read=28252
+ Planning time: 2.577 ms
+ Execution time: 7573.029 ms
+(19 rows)
+
+COMMIT;
+COMMIT

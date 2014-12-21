@@ -1,0 +1,58 @@
+BEGIN;
+BEGIN
+EXPLAIN
+select
+	p_brand,
+	p_type,
+	p_size,
+	count(distinct ps_suppkey) as supplier_cnt
+from
+	partsupp,
+	part
+where
+	p_partkey = ps_partkey
+	and p_brand <> 'Brand#53'
+	and p_type not like 'LARGE ANODIZED%'
+	and p_size in (23, 30, 48, 50, 47, 25, 44, 21)
+	and ps_suppkey not in (
+		select
+			s_suppkey
+		from
+			supplier
+		where
+			s_comment like '%Customer%Complaints%'
+	)
+group by
+	p_brand,
+	p_type,
+	p_size
+order by
+	supplier_cnt desc,
+	p_brand,
+	p_type,
+	p_size;
+                                                          QUERY PLAN                                                           
+-------------------------------------------------------------------------------------------------------------------------------
+ Sort  (cost=416551.93..416621.62 rows=27876 width=40)
+   Sort Key: (count(DISTINCT partsupp.ps_suppkey)), part.p_brand, part.p_type, part.p_size
+   ->  GroupAggregate  (cost=406797.57..414493.75 rows=27876 width=40)
+         Group Key: part.p_brand, part.p_type, part.p_size
+         ->  Sort  (cost=406797.57..408281.06 rows=593393 width=40)
+               Sort Key: part.p_brand, part.p_type, part.p_size
+               ->  Hash Join  (cost=58003.32..349895.25 rows=593393 width=40)
+                     Hash Cond: (partsupp.ps_partkey = part.p_partkey)
+                     ->  Seq Scan on partsupp  (cost=16.23..270974.23 rows=4000000 width=8)
+                           Filter: (NOT (hashed SubPlan 1))
+                           SubPlan 1
+                             ->  Index Scan using supplier_s_suppkey_idx_like on supplier  (cost=0.14..15.98 rows=100 width=4)
+                     ->  Hash  (cost=54270.40..54270.40 rows=297336 width=40)
+                           ->  Bitmap Heap Scan on part  (cost=5740.22..54270.40 rows=297336 width=40)
+                                 Recheck Cond: (p_size = ANY ('{23,30,48,50,47,25,44,21}'::integer[]))
+                                 Filter: ((p_brand <> 'Brand#53'::bpchar) AND ((p_type)::text !~~ 'LARGE ANODIZED%'::text))
+                                 ->  Bitmap Index Scan on part_p_size_idx  (cost=0.00..5665.89 rows=320327 width=0)
+                                       Index Cond: (p_size = ANY ('{23,30,48,50,47,25,44,21}'::integer[]))
+ Planning time: 3.248 ms
+(19 rows)
+
+COMMIT;
+COMMIT
